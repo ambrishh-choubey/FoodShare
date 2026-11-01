@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+
+{% block hero %}
+<section class="hero">
+  <span class="float-emoji" style="left:6%;top:18%">🍎</span>
+  <span class="float-emoji" style="left:44%;top:10%">🥖</span>
+  <span class="float-emoji" style="right:9%;top:22%">🍲</span>
+  <span class="float-emoji" style="left:14%;bottom:20%">🥕</span>
+  <span class="float-emoji" style="right:22%;bottom:16%">🍛</span>
+  <div class="container position-relative">
+    <div class="row">
+      <div class="col-lg-7">
+        <span class="chip mb-3"><i class="bi bi-heart-fill text-danger"></i> Zero Hunger &middot; Zero Waste</span>
+        <h1>Good food should feed people,<br>not <span class="typed-wrap"><span data-typed='["landfills.", "bins.", "waste."]'>landfills.</span><span class="typed-caret"></span></span></h1>
+        <p class="lead my-4">Restaurants, caterers and households list their surplus food. Nearby NGOs see it on a live map, claim it in one click and pick it up before it expires.</p>
+        <a href="{{ url_for('register') }}" class="btn btn-fs btn-lg me-2"><i class="bi bi-rocket-takeoff"></i> Get started</a>
+        <a href="{{ url_for('login') }}" class="btn btn-glass btn-lg">Login</a>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3 text-center mb-5">
+  {% for key, label, icon in [('donations', 'Donations listed', 'box2-heart'), ('picked_up', 'Picked up', 'check2-all'), ('donors', 'Donors', 'shop'), ('ngos', 'NGOs', 'building-check')] %}
+  <div class="col-6 col-md-3 reveal d{{ loop.index0 % 4 }}">
+    <div class="fs-card stat-card hover-lift">
+      <i class="bi bi-{{ icon }} fs-3 text-success"></i>
+      <div class="num" data-stat="{{ key }}" data-count="{{ stats[key] }}">{{ stats[key] }}</div>
+      <div class="text-muted">{{ label }}</div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<h2 class="text-center fw-bold mb-4 reveal">How it works</h2>
+<div class="row g-4 mb-5">
+  <div class="col-md-4 reveal d1"><div class="fs-card p-4 h-100 hover-lift">
+    <div class="step-icon"><i class="bi bi-journal-plus"></i></div>
+    <h5>1. Donors list surplus</h5><p class="text-muted mb-0">Post the food type, quantity and how long it stays safe. Your pin appears on nearby NGO maps instantly.</p></div></div>
+  <div class="col-md-4 reveal d2"><div class="fs-card p-4 h-100 hover-lift">
+    <div class="step-icon"><i class="bi bi-geo-alt-fill"></i></div>
+    <h5>2. NGOs find &amp; claim</h5><p class="text-muted mb-0">A live Leaflet map and distance-sorted list show what is close. One click claims it - no double bookings.</p></div></div>
+  <div class="col-md-4 reveal d3"><div class="fs-card p-4 h-100 hover-lift">
+    <div class="step-icon"><i class="bi bi-truck"></i></div>
+    <h5>3. Pick up &amp; feed</h5><p class="text-muted mb-0">The NGO collects the food and marks it picked up. Donors watch the status update in real time.</p></div></div>
+</div>
+
+<div class="fs-card p-4 p-md-5 text-center reveal">
+  <h3 class="fw-bold">Building something on top of FoodShare?</h3>
+  <p class="text-muted">Everything you see here runs on a documented JSON API.</p>
+  <a class="btn btn-fs" href="{{ url_for('api_docs') }}"><i class="bi bi-braces"></i> Explore the API</a>
+</div>
+{% endblock %}

@@ -1,0 +1,3 @@
+# Only install what you need when you switch DB_ENGINE in database/db.env
+PyMySQL>=1.1          # DB_ENGINE=mysql
+psycopg2-binary>=2.9  # DB_ENGINE=postgresql

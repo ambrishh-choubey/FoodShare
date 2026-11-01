@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Admin{% endblock %}
+
+{% block hero %}
+<section class="page-banner">
+  <div class="container">
+    <h2><i class="bi bi-shield-check"></i> Admin overview</h2>
+    <span class="chip"><i class="bi bi-database"></i> {{ db_info.engine|upper }} &middot; {{ db_info.database }}</span>
+    <span class="chip"><i class="bi bi-people"></i> Users <b>{{ users|length }}</b></span>
+    <span class="chip"><i class="bi bi-box-seam"></i> Listings <b>{{ stats.donations }}</b></span>
+    <span class="chip"><i class="bi bi-basket2"></i> Active <b>{{ stats.active }}</b></span>
+    <span class="chip"><i class="bi bi-check2-all"></i> Picked up <b>{{ stats.picked_up }}</b></span>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<div class="fs-card mb-4">
+  <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <span>Users ({{ users|length }})</span>
+    <input class="form-control form-control-sm" style="max-width:240px" placeholder="Filter users..." data-filter-table="users-table">
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover align-middle mb-0" id="users-table">
+      <thead><tr><th>ID</th><th>Name</th><th>Role</th><th>Email</th><th>Lat</th><th>Lng</th></tr></thead>
+      <tbody>
+      {% for u in users %}
+        <tr>
+          <td>{{ u.id }}</td><td>{{ u.name }}</td>
+          <td><span class="badge bg-{{ 'dark' if u.role == ADMIN else 'primary' if u.role == NGO else 'success' }}">{{ u.role }}</span></td>
+          <td>{{ u.email }}</td>
+          <td>{{ '%.4f'|format(u.latitude) }}</td><td>{{ '%.4f'|format(u.longitude) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="fs-card">
+  <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <span>Donation listings ({{ listings|length }})</span>
+    <input class="form-control form-control-sm" style="max-width:240px" placeholder="Filter listings..." data-filter-table="listings-table">
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover align-middle mb-0" id="listings-table">
+      <thead><tr><th>ID</th><th>Food</th><th>Qty</th><th>Donor</th><th>Expires</th><th>Status</th><th>Claimed by</th></tr></thead>
+      <tbody>
+      {% for l in listings %}
+        <tr>
+          <td>{{ l.id }}</td><td>{{ l.food_type }}</td><td>{{ l.quantity }}</td>
+          <td>{{ l.donor.name }}</td>
+          <td>{{ l.expires_at.strftime('%d %b %H:%M') }} UTC{% if l.is_expired %} <span class="badge bg-secondary">Expired</span>{% endif %}</td>
+          <td>{{ l.status }}</td>
+          <td>{{ l.claimed_by.name if l.claimed_by else '—' }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-3">No listings yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

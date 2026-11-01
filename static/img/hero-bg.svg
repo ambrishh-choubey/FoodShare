@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#052e16"/>
+      <stop offset=".55" stop-color="#15803d"/>
+      <stop offset="1" stop-color="#65a30d"/>
+    </linearGradient>
+    <radialGradient id="sun" cx=".5" cy=".5" r=".5">
+      <stop offset="0" stop-color="#fde68a" stop-opacity=".95"/>
+      <stop offset="1" stop-color="#f59e0b" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="blur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="40"/></filter>
+    <path id="leaf" d="M0 0 C40 -60 120 -60 160 0 C120 60 40 60 0 0 Z"/>
+    <g id="bowl">
+      <path d="M-100 0 H100 C100 70 50 110 0 110 C-50 110 -100 70 -100 0 Z"/>
+      <path d="M-30 -20 C-45 -50 -15 -60 -30 -95 M10 -20 C-5 -50 25 -60 10 -95 M50 -20 C35 -50 65 -60 50 -95" fill="none" stroke-width="7" stroke-linecap="round"/>
+    </g>
+    <path id="heart" d="M0 30 C-60 -20 -40 -70 0 -35 C40 -70 60 -20 0 30 Z"/>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <circle cx="1290" cy="190" r="280" fill="url(#sun)"/>
+
+  <g filter="url(#blur)" opacity=".4">
+    <circle cx="200" cy="140" r="170" fill="#bef264"/>
+    <circle cx="760" cy="760" r="210" fill="#22c55e"/>
+    <circle cx="1480" cy="700" r="190" fill="#fbbf24"/>
+  </g>
+
+  <g fill="none" stroke="#ffffff" stroke-opacity=".13" stroke-width="3">
+    <circle cx="250" cy="680" r="170"/><circle cx="250" cy="680" r="120"/><circle cx="250" cy="680" r="70"/>
+    <circle cx="1380" cy="420" r="130"/><circle cx="1380" cy="420" r="85"/>
+  </g>
+
+  <g fill="#dcfce7" fill-opacity=".14">
+    <use href="#leaf" transform="translate(120 230) rotate(-30) scale(1.2)"/>
+    <use href="#leaf" transform="translate(520 120) rotate(20)"/>
+    <use href="#leaf" transform="translate(980 640) rotate(-70) scale(1.4)"/>
+    <use href="#leaf" transform="translate(1180 760) rotate(35)"/>
+    <use href="#leaf" transform="translate(60 520) rotate(60) scale(.8)"/>
+    <use href="#leaf" transform="translate(1420 90) rotate(140) scale(1.1)"/>
+  </g>
+
+  <g fill="#ffffff" fill-opacity=".12" stroke="#ffffff" stroke-opacity=".2">
+    <use href="#bowl" transform="translate(1130 560) scale(1.15)"/>
+    <use href="#bowl" transform="translate(430 300) scale(.7) rotate(-8)"/>
+  </g>
+
+  <g fill="#fda4af" fill-opacity=".35">
+    <use href="#heart" transform="translate(860 210) scale(1.1)"/>
+    <use href="#heart" transform="translate(330 520) scale(.6) rotate(-12)"/>
+    <use href="#heart" transform="translate(1500 300) scale(.7) rotate(14)"/>
+  </g>
+
+  <path d="M0 760 C300 690 600 820 900 750 S1400 690 1600 770 L1600 900 L0 900 Z" fill="#ffffff" fill-opacity=".07"/>
+  <path d="M0 810 C320 760 620 870 960 805 S1420 760 1600 830 L1600 900 L0 900 Z" fill="#ffffff" fill-opacity=".08"/>
+</svg>

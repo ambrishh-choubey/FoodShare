@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}NGO Dashboard{% endblock %}
+{% block head %}<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">{% endblock %}
+
+{% block hero %}
+<section class="page-banner">
+  <div class="container">
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-3">
+      <div>
+        <h2><i class="bi bi-map"></i> Food available near you</h2>
+        <span class="chip"><i class="bi bi-basket2"></i> Active <b id="cnt-active">{{ boot.nearby|length }}</b></span>
+        <span class="chip"><i class="bi bi-bag-check"></i> To collect <b id="cnt-mine">0</b></span>
+        <span class="chip"><i class="bi bi-bullseye"></i> Radius <b id="cnt-radius">{{ radius|int }}</b> km</span>
+      </div>
+      <form class="d-flex align-items-center gap-2" id="radius-form" method="get">
+        <label class="mb-0 text-white" for="radius">Radius (km)</label>
+        <input class="form-control form-control-sm" style="width:90px" type="number" inputmode="numeric" min="1" max="500" id="radius" name="radius" value="{{ radius|int }}">
+        <button class="btn btn-sm btn-glass" type="submit">Update</button>
+      </form>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<div class="alert alert-light border small d-flex gap-2 align-items-start" role="note">
+  <i class="bi bi-shield-lock mt-1"></i>
+  <span>To protect donors, the map shows only an <b>approximate area</b>. The exact address and contact details are revealed to you only after you claim a listing.</span>
+</div>
+<noscript><div class="alert alert-warning">JavaScript is off: the map is unavailable and the list will not refresh automatically. You can still claim food below.</div></noscript>
+
+<div class="row g-4 mb-4">
+  <div class="col-lg-7">
+    <div class="fs-card p-2"><div id="map" role="region" aria-label="Map of nearby food listings"></div></div>
+  </div>
+  <div class="col-lg-5">
+    <div class="fs-card h-100">
+      <div class="card-header d-flex justify-content-between"><span>Active listings</span><small class="text-muted"><i class="bi bi-arrow-repeat"></i> live</small></div>
+      <div id="list-error" hidden></div>
+      <div class="card-body listing-scroll d-grid gap-2" id="listing-cards">
+        {# Server-rendered fallback cards (replaced by JavaScript). #}
+        {% for l in boot.nearby %}
+        <div class="listing-card">
+          <div class="title">{{ l.food_type }}</div>
+          <div class="small text-muted">{{ l.donor.name }} &middot; {{ l.quantity }} &middot; ~{{ l.distance_km }} km</div>
+          <form method="post" action="{{ url_for('claim_listing', listing_id=l.id) }}" class="mt-2" data-confirm="Claim '{{ l.food_type }}' ({{ l.quantity }}) from {{ l.donor.name }}? You are committing to collect it before it expires." data-confirm-title="Claim this food?" data-confirm-ok="Yes, claim it">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-fs btn-sm" type="submit"><i class="bi bi-check2-circle"></i> Claim Food</button>
+          </form>
+        </div>
+        {% else %}
+        <div class="empty-state"><i class="bi bi-search-heart"></i>No active listings within {{ radius|int }} km.<br>Try a larger radius.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="fs-card">
+  <div class="card-header">My claimed pickups <small class="text-muted ms-1">(exact details visible to you only)</small></div>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0 table-stack">
+      <thead><tr><th>Food</th><th>Quantity</th><th>Donor</th><th>Pickup details</th><th>Status</th><th></th></tr></thead>
+      <tbody id="mine-rows">
+        {% for l in boot.mine %}
+        <tr>
+          <td data-label="Food" class="fw-semibold">{{ l.food_type }}</td>
+          <td data-label="Quantity">{{ l.quantity }}</td>
+          <td data-label="Donor">{{ l.donor.name }}<div class="small text-muted">{{ l.donor.email }}</div></td>
+          <td data-label="Pickup details">{{ l.donor.address or 'No address given' }}</td>
+          <td data-label="Status">{{ l.status.replace('_', ' ') }}</td>
+          <td class="text-end">
+            {% if l.status == CLAIMED %}
+            <form method="post" action="{{ url_for('mark_picked_up', listing_id=l.id) }}" data-confirm="Confirm that you have collected '{{ l.food_type }}'. This cannot be undone." data-confirm-title="Mark as picked up?" data-confirm-ok="Yes, picked up">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-outline-success btn-sm" type="submit">Mark picked up</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr class="empty-row"><td colspan="6"><div class="empty-state"><i class="bi bi-inbox"></i>You haven't claimed anything yet.</div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<script id="boot" type="application/json">{{ boot|tojson }}</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{{ url_for('static', filename='js/ngo.js') }}"></script>
+{% endblock %}

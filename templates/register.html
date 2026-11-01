@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Register{% endblock %}
+{% block body_class %}bg-auth{% endblock %}
+{% block head %}<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">{% endblock %}
+{% block content %}
+<div class="row justify-content-center py-3">
+  <div class="col-md-8 col-lg-6">
+    <div class="fs-card auth-card">
+      <div class="p-4 p-md-5">
+        <h3 class="fw-bold mb-1">Create your account</h3>
+        <p class="text-muted">Join the movement against food waste.</p>
+        <form method="post" class="needs-validation" novalidate>
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="row g-2 mb-3">
+            <div class="col-6 role-option">
+              <label class="w-100 h-100 position-relative">
+                <input type="radio" name="role" value="Donor" {{ 'checked' if form.get('role', 'Donor') == 'Donor' }}>
+                <span class="role-card"><i class="bi bi-shop"></i><b>Donor</b><br><small class="text-muted">Restaurant, caterer, household</small></span>
+              </label>
+            </div>
+            <div class="col-6 role-option">
+              <label class="w-100 h-100 position-relative">
+                <input type="radio" name="role" value="NGO" {{ 'checked' if form.get('role') == 'NGO' }}>
+                <span class="role-card"><i class="bi bi-building-check"></i><b>NGO</b><br><small class="text-muted">Collects &amp; distributes food</small></span>
+              </label>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="name">Name / Organisation</label>
+            <input class="form-control" id="name" name="name" value="{{ form.get('name', '') }}" maxlength="120" required>
+            <div class="invalid-feedback">Please enter a name.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="email">Email</label>
+            <input class="form-control" type="email" id="email" name="email" value="{{ form.get('email', '') }}" autocomplete="username" maxlength="160" required>
+            <div class="invalid-feedback">Enter a valid email address.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="password">Password (min 8 characters)</label>
+            <div class="input-group has-validation">
+              <input class="form-control" type="password" id="password" name="password" minlength="8" maxlength="128" autocomplete="new-password" required>
+              <button class="btn btn-outline-secondary" type="button" data-toggle-password="password" aria-label="Show password"><i class="bi bi-eye"></i></button>
+              <div class="invalid-feedback">Use at least 8 characters.</div>
+            </div>
+          </div>
+
+          <div class="mb-3" id="address-group">
+            <label class="form-label" for="address">Pickup address <span class="text-muted small">(optional)</span></label>
+            <input class="form-control" id="address" name="address" value="{{ form.get('address', '') }}" maxlength="255" placeholder="Shown only to the NGO that claims your food">
+            <div class="form-text"><i class="bi bi-shield-lock"></i> Your exact address and location stay private. NGOs see only your approximate area until they claim your donation.</div>
+          </div>
+
+          <label class="form-label">Your location <span class="text-muted small">(click the map, drag the pin, or use GPS)</span></label>
+          <div id="pick-map" class="mb-2"></div>
+          <div class="row g-2 mb-2">
+            <div class="col"><input class="form-control form-control-sm" id="latitude" name="latitude" type="number" step="any" min="-90" max="90" value="{{ form.get('latitude', '12.9716') }}" aria-label="Latitude" required><div class="invalid-feedback">-90 to 90</div></div>
+            <div class="col"><input class="form-control form-control-sm" id="longitude" name="longitude" type="number" step="any" min="-180" max="180" value="{{ form.get('longitude', '77.5946') }}" aria-label="Longitude" required><div class="invalid-feedback">-180 to 180</div></div>
+          </div>
+          <button type="button" class="btn btn-outline-secondary btn-sm mb-3" id="locate" data-busy-text="Locating..."><i class="bi bi-geo-alt"></i> Use my current location</button>
+          <button class="btn btn-fs btn-lg w-100" type="submit">Create account</button>
+        </form>
+        <p class="mt-3 mb-0 small text-muted text-center">Already registered? <a href="{{ url_for('login') }}">Login</a></p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{{ url_for('static', filename='js/register.js') }}"></script>
+{% endblock %}

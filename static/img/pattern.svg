@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160">
+  <defs>
+    <path id="l" d="M0 0 C10 -16 30 -16 40 0 C30 16 10 16 0 0 Z"/>
+    <path id="h" d="M0 8 C-15 -5 -10 -18 0 -9 C10 -18 15 -5 0 8 Z"/>
+  </defs>
+  <g fill="#16a34a" fill-opacity=".07">
+    <use href="#l" transform="translate(22 30) rotate(-35)"/>
+    <use href="#l" transform="translate(104 98) rotate(40) scale(1.1)"/>
+    <use href="#h" transform="translate(112 34)"/>
+    <use href="#h" transform="translate(40 120) scale(.8) rotate(-10)"/>
+    <circle cx="78" cy="70" r="5"/>
+    <circle cx="148" cy="148" r="4"/>
+    <circle cx="10" cy="86" r="3"/>
+  </g>
+</svg>

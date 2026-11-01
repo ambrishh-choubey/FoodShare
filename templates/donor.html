@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Donor Dashboard{% endblock %}
+
+{% block hero %}
+<section class="page-banner">
+  <div class="container">
+    <h2><i class="bi bi-box-seam"></i> Hello, {{ g.user.name }}</h2>
+    <p class="mb-3 opacity-75">Every listing you post can become someone's next meal.</p>
+    <span class="chip"><i class="bi bi-hourglass-split"></i> Pending <b id="cnt-pending">0</b></span>
+    <span class="chip"><i class="bi bi-bag-check"></i> Claimed <b id="cnt-claimed">0</b></span>
+    <span class="chip"><i class="bi bi-check2-all"></i> Picked up <b id="cnt-picked">0</b></span>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  <div class="col-lg-4">
+    <div class="fs-card">
+      <div class="card-header"><i class="bi bi-plus-circle text-success"></i> List surplus food</div>
+      <div class="card-body">
+        <form method="post" id="donation-form" class="needs-validation" novalidate>
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="mb-3">
+            <label class="form-label" for="food_type">Food type</label>
+            <input class="form-control" id="food_type" name="food_type" placeholder="e.g. Cooked rice &amp; dal" maxlength="160" required>
+            <div class="invalid-feedback">Tell NGOs what food this is.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="quantity">Quantity</label>
+            <input class="form-control" id="quantity" name="quantity" placeholder="e.g. 20 meals / 5 kg" maxlength="80" required>
+            <div class="invalid-feedback">Enter an amount, e.g. "20 meals".</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="expiry_window">Safe to collect within (hours)</label>
+            <input class="form-control" type="number" inputmode="numeric" id="expiry_window" name="expiry_window" min="1" max="168" step="1" value="4" required>
+            <div class="invalid-feedback">Enter a whole number from 1 to 168.</div>
+            <div class="form-text">The listing disappears from NGO maps once this window passes.</div>
+          </div>
+          <button class="btn btn-fs w-100" type="submit" data-busy-text="Posting..."><i class="bi bi-send"></i> Post donation</button>
+        </form>
+        <hr>
+        <div class="small text-muted"><i class="bi bi-shield-lock"></i> NGOs only see your approximate area until they claim your food. Your exact location and address are shared with the claiming NGO only.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-8">
+    <div class="fs-card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>My donations</span><small class="text-muted"><i class="bi bi-arrow-repeat"></i> live</small>
+      </div>
+      <div id="donation-error" hidden></div>
+      <noscript><div class="alert alert-warning m-3">JavaScript is off, so this list does not update automatically. You can still post, and reload the page to see changes.</div></noscript>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0 table-stack">
+          <thead>
+            <tr><th>Food</th><th>Quantity</th><th>Expires</th><th>Status</th><th>Claimed by</th><th></th></tr>
+          </thead>
+          <tbody id="donation-rows">
+            {# Server-rendered rows: shown instantly and used when JavaScript is unavailable. #}
+            {% for l in boot.listings %}
+            <tr>
+              <td data-label="Food" class="fw-semibold">{{ l.food_type }}</td>
+              <td data-label="Quantity">{{ l.quantity }}</td>
+              <td data-label="Expires">{{ l.expires_at[:16].replace('T', ' ') }} UTC</td>
+              <td data-label="Status">{{ l.status.replace('_', ' ') }}</td>
+              <td data-label="Claimed by">{{ l.claimed_by.name if l.claimed_by else '-' }}</td>
+              <td class="text-end">
+                {% if l.status == PENDING %}
+                <form method="post" action="{{ url_for('cancel_listing', listing_id=l.id) }}" data-confirm="Withdraw '{{ l.food_type }}'? NGOs will no longer see it." data-confirm-title="Withdraw this listing?" data-confirm-ok="Withdraw" data-confirm-danger>
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-outline-danger btn-sm" type="submit">Withdraw</button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr class="empty-row"><td colspan="6"><div class="empty-state"><i class="bi bi-basket"></i>No donations yet. Post your first surplus listing!</div></td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+<script id="boot" type="application/json">{{ boot|tojson }}</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/donor.js') }}"></script>
+{% endblock %}
