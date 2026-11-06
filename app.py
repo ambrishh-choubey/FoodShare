@@ -17,7 +17,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import click
-from flask import (Flask, flash, g, redirect, render_template, request,
+from flask import (Flask,abort, flash, g, redirect, render_template, request,
                    session, url_for)
 
 import services
@@ -82,6 +82,14 @@ def create_app(config=None, database_uri=None):
     if config:
         app.config.update(config)
 
+    # Behind a reverse proxy request.remote_addr is the proxy's IP. Set
+    # TRUSTED_PROXY_COUNT=1 (number of proxies YOU control) to use the real client IP.
+    # Leave 0 otherwise: trusting X-Forwarded-For with no proxy lets attackers spoof IPs.
+    proxies = int(os.environ.get("TRUSTED_PROXY_COUNT", "0") or 0)
+    if proxies:
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=proxies, x_proto=proxies, x_host=proxies)
+
     init_db(app, database_uri)
     app.register_blueprint(api_bp)
 
@@ -132,7 +140,11 @@ def create_app(config=None, database_uri=None):
                 flash(err.message, "danger")
                 return render_template("register.html", form=request.form), 400
             login_user(user)
-            flash(f"Welcome, {user.name}!", "success")
+            if user.role == NGO:
+                flash("Account created. An administrator must approve your NGO "
+                      "before you can claim food.", "info")
+            else:
+                flash(f"Welcome, {user.name}!", "success")
             return redirect(home_url(user))
         return render_template("register.html", form={})
 
@@ -141,10 +153,11 @@ def create_app(config=None, database_uri=None):
         if request.method == "POST":
             try:
                 user = services.authenticate(request.form.get("email"),
-                                             request.form.get("password"))
+                                             request.form.get("password"),
+                                             request.remote_addr)
             except ServiceError as err:
                 flash(err.message, "danger")
-                return render_template("login.html"), 401
+                return render_template("login.html"), err.status
             login_user(user)
             flash("Logged in successfully.", "success")
             return redirect(home_url(user))
@@ -187,6 +200,8 @@ def create_app(config=None, database_uri=None):
     @app.route("/ngo")
     @web_login_required(NGO)
     def ngo_dashboard():
+        if not g.user.is_approved:
+            return render_template("ngo_pending.html")
         radius = services.parse_radius(request.args.get("radius"))
         boot = {
             "radius": radius,
@@ -226,7 +241,20 @@ def create_app(config=None, database_uri=None):
         return render_template("admin.html",
                                users=User.query.order_by(User.id).all(),
                                listings=services.all_listings(),
-                               stats=services.get_stats())
+                               stats=services.get_stats(),
+                               pending=services.pending_ngos())
+
+    @app.route("/admin/ngos/<int:user_id>/<action>", methods=["POST"])
+    @web_login_required(ADMIN)
+    def review_ngo(user_id, action):
+        if action not in ("approve", "revoke"):
+            abort(404)
+        try:
+            ngo = services.set_ngo_approval(g.user, user_id, action == "approve")
+            flash(f"{ngo.name} {'approved' if ngo.is_approved else 'approval revoked'}.", "success")
+        except ServiceError as err:
+            flash(err.message, "warning")
+        return redirect(url_for("admin_panel"))
 
     @app.route("/api/docs")
     def api_docs():

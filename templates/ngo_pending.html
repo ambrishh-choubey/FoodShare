@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Awaiting approval{% endblock %}
+{% block content %}
+<div class="fs-card text-center py-5 px-3 my-4">
+  <div class="step-icon mx-auto"><i class="bi bi-hourglass-split"></i></div>
+  <h3 class="fw-bold">Your NGO account is awaiting approval</h3>
+  <p class="text-muted mb-1">An administrator must verify <b>{{ g.user.name }}</b> before you can see or claim food donations.</p>
+  <p class="text-muted mb-0">Check back soon and refresh this page once you have been approved.</p>
+</div>
+{% endblock %}

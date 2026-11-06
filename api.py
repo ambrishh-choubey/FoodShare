@@ -1,3 +1,6 @@
+
+
+
 """JSON API (v1). Session-cookie authentication + CSRF header on every
 state-changing request. All responses use the envelope in responses.py."""
 from datetime import datetime, timezone
@@ -27,8 +30,10 @@ def _with_token(user):
 
 @bp.errorhandler(ServiceError)
 def handle_service_error(err):
-    return fail(err.code, err.message, err.status)
-
+    response, status = fail(err.code, err.message, err.status)
+    if err.retry_after:
+        response.headers["Retry-After"] = str(err.retry_after)
+    return response, status
 
 # ------------------------------------------------------------------ system
 @bp.get("/health")
@@ -62,7 +67,8 @@ def register():
 @bp.post("/auth/login")
 def login():
     body = payload()
-    user = services.authenticate(body.get("email"), body.get("password"))
+    user = services.authenticate(body.get("email"), body.get("password"),
+                                 request.remote_addr)
     login_user(user)
     return ok(_with_token(user), "Logged in.")
 
@@ -145,7 +151,16 @@ def list_users():
     users = User.query.order_by(User.id).all()
     return ok([u.to_dict() for u in users], count=len(users))
 
+@bp.post("/users/<int:user_id>/approve")
+@api_login_required(ADMIN)
+def approve_ngo(user_id):
+    return ok(services.set_ngo_approval(g.user, user_id, True).to_dict(), "NGO approved.")
 
+
+@bp.post("/users/<int:user_id>/revoke")
+@api_login_required(ADMIN)
+def revoke_ngo(user_id):
+    return ok(services.set_ngo_approval(g.user, user_id, False).to_dict(), "NGO approval revoked.")
 # ------------------------------------------------------ docs (rendered page)
 API_ENDPOINTS = [
     {"method": "GET", "path": "/health", "auth": "Public",

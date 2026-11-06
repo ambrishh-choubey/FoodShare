@@ -16,20 +16,54 @@
 
 {% block content %}
 <div class="fs-card mb-4">
+  <div class="card-header">NGO approvals <span class="badge bg-warning text-dark ms-1">{{ pending|length }}</span></div>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0 table-stack">
+      <thead><tr><th>NGO</th><th>Email</th><th>Location</th><th></th></tr></thead>
+      <tbody>
+      {% for n in pending %}
+        <tr>
+          <td data-label="NGO" class="fw-semibold">{{ n.name }}</td>
+          <td data-label="Email">{{ n.email }}</td>
+          <td data-label="Location">{{ '%.3f'|format(n.latitude) }}, {{ '%.3f'|format(n.longitude) }}</td>
+          <td class="text-end">
+            <form method="post" action="{{ url_for('review_ngo', user_id=n.id, action='approve') }}" data-confirm="Approve {{ n.name }}? They will be able to see and claim food donations." data-confirm-title="Approve NGO?" data-confirm-ok="Approve">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-fs btn-sm" type="submit"><i class="bi bi-check2-circle"></i> Approve</button>
+            </form>
+          </td>
+        </tr>
+      {% else %}
+        <tr class="empty-row"><td colspan="4"><div class="empty-state"><i class="bi bi-patch-check"></i>No NGOs are waiting for approval.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<div class="fs-card mb-4">
   <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
     <span>Users ({{ users|length }})</span>
     <input class="form-control form-control-sm" style="max-width:240px" placeholder="Filter users..." data-filter-table="users-table">
   </div>
   <div class="table-responsive">
     <table class="table table-sm table-hover align-middle mb-0" id="users-table">
-      <thead><tr><th>ID</th><th>Name</th><th>Role</th><th>Email</th><th>Lat</th><th>Lng</th></tr></thead>
+      <thead><tr><th>ID</th><th>Name</th><th>Role</th><th>Email</th><th>Lat</th><th>Lng</th><th>Approval</th></tr></thead>
       <tbody>
       {% for u in users %}
         <tr>
           <td>{{ u.id }}</td><td>{{ u.name }}</td>
           <td><span class="badge bg-{{ 'dark' if u.role == ADMIN else 'primary' if u.role == NGO else 'success' }}">{{ u.role }}</span></td>
           <td>{{ u.email }}</td>
-          <td>{{ '%.4f'|format(u.latitude) }}</td><td>{{ '%.4f'|format(u.longitude) }}</td>
+          <td>{{ '%.4f'|format(u.latitude) }}</td>
+          <td>
+            {% if u.role == NGO and u.is_approved %}
+            <form method="post" action="{{ url_for('review_ngo', user_id=u.id, action='revoke') }}" data-confirm="Revoke approval for {{ u.name }}? They will lose access to food listings." data-confirm-title="Revoke approval?" data-confirm-ok="Revoke" data-confirm-danger>
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-outline-danger btn-sm" type="submit">Revoke</button>
+            </form>
+            {% elif u.role == NGO %}<span class="badge bg-warning text-dark">Pending</span>
+            {% else %}<span class="text-muted">-</span>{% endif %}
+          </td>
         </tr>
       {% endfor %}
       </tbody>

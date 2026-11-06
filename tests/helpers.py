@@ -41,11 +41,14 @@ class AppTestCase(unittest.TestCase):
         return services.register_user(name, f"donor{self.counter}@t.test", PASSWORD,
                                       DONOR, lat, lng, address)
 
-    def make_ngo(self, name=None, lat=12.96, lng=77.64):
+    def make_ngo(self, name=None, lat=12.96, lng=77.64, approved=True):
         self.counter += 1
-        return services.register_user(name or f"NGO {self.counter}",
-                                      f"ngo{self.counter}@t.test", PASSWORD, NGO, lat, lng)
-
+        ngo = services.register_user(name or f"NGO {self.counter}",
+                                     f"ngo{self.counter}@t.test", PASSWORD, NGO, lat, lng)
+        if approved:
+            ngo.is_approved = True
+            db.session.commit()
+        return ngo
     def make_listing(self, donor, hours=4):
         return services.create_listing(donor, "Veg biryani", "20 meals", hours)
 

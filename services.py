@@ -11,7 +11,7 @@ import time
 
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import joinedload
-
+import throttle
 from database import (ADMIN, CLAIMED, DEFAULT_LAT, DEFAULT_LNG, DONOR, NGO,
                       PENDING, PICKED_UP, DonationListing, User, db, utcnow)
 
@@ -24,12 +24,12 @@ MAX_PASSWORD = 128  # hashing is deliberately slow; cap input size
 
 
 class ServiceError(Exception):
-    def __init__(self, message, code="bad_request", status=400):
+    def __init__(self, message, code="bad_request", status=400, retry_after=None):
         super().__init__(message)
         self.message = message
         self.code = code
         self.status = status
-
+        self.retry_after = retry_after  # seconds, for HTTP 429
 
 # ----------------------------------------------------------------- helpers
 def haversine_km(lat1, lon1, lat2, lon2):
@@ -102,7 +102,8 @@ def register_user(name, email, password, role, lat=None, lng=None, address=None)
     user = User(name=name, email=email, role=role,
                 latitude=parse_coord(lat, DEFAULT_LAT, -90, 90),
                 longitude=parse_coord(lng, DEFAULT_LNG, -180, 180),
-                address=address if role == DONOR else None)
+                address=address if role == DONOR else None,
+                is_approved=(role != NGO))  # NGOs wait for an admin
     user.set_password(password)
     db.session.add(user)
     db.session.commit()
@@ -127,13 +128,47 @@ def create_admin(email, password, name="Platform Admin"):
     return admin
 
 
-def authenticate(email, password):
-    user = User.query.filter_by(email=(email or "").strip().lower()).first()
-    if not user or not user.check_password((password or "")[:MAX_PASSWORD]):
+def authenticate(email, password, ip=None):
+    email = (email or "").strip().lower()
+    password = password or ""
+    # Reject, never truncate: a 130-char guess must not match a 128-char password.
+    if len(password) > MAX_PASSWORD:
+        raise ServiceError(f"Password must be at most {MAX_PASSWORD} characters.",
+                           "validation_error")
+    try:
+        throttle.check(email, ip)
+    except throttle.Throttled as limited:
+        minutes = max(1, math.ceil(limited.retry_after / 60))
+        raise ServiceError(f"Too many failed login attempts. Try again in {minutes} minute(s).",
+                           "rate_limited", 429, retry_after=limited.retry_after)
+    user = User.query.filter_by(email=email).first()
+    if not user or not user.check_password(password):
+        throttle.record_failure(email, ip)  # also counts unknown emails (no enumeration)
         raise ServiceError("Invalid email or password.", "invalid_credentials", 401)
+    throttle.clear_account(email)
     return user
 
 
+# ------------------------------------------------------------ NGO approval
+def _require_approved(ngo):
+    if not ngo.is_approved:
+        raise ServiceError("Your NGO account is awaiting admin approval. "
+                           "You can browse and claim food once it is approved.",
+                           "not_approved", 403)
+
+
+def pending_ngos():
+    return User.query.filter_by(role=NGO, is_approved=False).order_by(User.id).all()
+
+
+def set_ngo_approval(admin, ngo_id, approved):
+    _require_role(admin, ADMIN, "approve NGOs")
+    ngo = db.session.get(User, ngo_id)
+    if ngo is None or ngo.role != NGO:
+        raise ServiceError("NGO not found.", "not_found", 404)
+    ngo.is_approved = bool(approved)
+    db.session.commit()
+    return ngo
 # ---------------------------------------------------------------- listings
 def create_listing(donor, food_type, quantity, expiry_window):
     _require_role(donor, DONOR, "post food listings")
@@ -207,6 +242,7 @@ def nearby_listings(ngo, radius_km=50.0):
     sent to the browser - so repeated queries can't be used to pin down an
     exact location.
     """
+    _require_approved(ngo)
     rows = []
     query = (DonationListing.query.options(joinedload(DonationListing.donor))
              .filter(DonationListing.status == PENDING,
@@ -247,6 +283,7 @@ def claim_listing(ngo, listing_id):
     gets rowcount == 1; everyone else gets 0 and a precise error.
     """
     _require_role(ngo, NGO, "claim food")
+    _require_approved(ngo)
     now = utcnow()
     updated = _write(lambda: (
         db.session.query(DonationListing)
@@ -292,6 +329,7 @@ def withdraw_listing(donor, listing_id):
 def mark_picked_up(ngo, listing_id):
     """Complete a pickup - only by the NGO that claimed it, once."""
     _require_role(ngo, NGO, "complete pickups")
+    _require_approved(ngo)
     updated = _write(lambda: (
         db.session.query(DonationListing)
         .filter(DonationListing.id == listing_id,
