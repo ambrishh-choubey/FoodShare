@@ -136,7 +136,8 @@
     const map = {
       Pending: ['warning text-dark', 'hourglass-split', 'Pending'],
       Claimed: ['info text-dark', 'bag-check', 'Claimed'],
-      Picked_Up: ['success', 'check2-all', 'Picked up']
+      Picked_Up: ['success', 'check2-all', 'Picked up'],
+      Withdrawn: ['secondary', 'x-circle', 'Withdrawn']
     };
     const s = map[status] || ['secondary', 'question', status];
     return '<span class="badge bg-' + s[0] + '"><i class="bi bi-' + s[1] + ' me-1"></i>' + esc(s[2]) + '</span>';

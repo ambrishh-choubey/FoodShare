@@ -15,8 +15,8 @@ from .core import db
 
 DONOR, NGO, ADMIN = "Donor", "NGO", "Admin"
 ROLES = (DONOR, NGO, ADMIN)
-PENDING, CLAIMED, PICKED_UP = "Pending", "Claimed", "Picked_Up"
-STATUSES = (PENDING, CLAIMED, PICKED_UP)
+PENDING, CLAIMED, PICKED_UP, WITHDRAWN = "Pending", "Claimed", "Picked_Up", "Withdrawn"
+STATUSES = (PENDING, CLAIMED, PICKED_UP, WITHDRAWN)
 DEFAULT_LAT, DEFAULT_LNG = 12.9716, 77.5946  # Bengaluru
 
 # Before a claim, NGOs only see the donor's AREA: coordinates rounded to
@@ -77,10 +77,9 @@ class User(db.Model):
 class DonationListing(db.Model):
     __tablename__ = "donation_listings"
     __table_args__ = (
-        db.CheckConstraint("status IN ('Pending', 'Claimed', 'Picked_Up')",
-                           name="ck_listing_status"),
+        db.CheckConstraint("status IN ('Pending', 'Claimed', 'Picked_Up', 'Withdrawn')", name="ck_listing_status"),
         db.CheckConstraint(
-            "(status = 'Pending' AND claimed_by_ngo_id IS NULL) OR "
+            "(status IN ('Pending', 'Withdrawn') AND claimed_by_ngo_id IS NULL) OR "
             "(status IN ('Claimed', 'Picked_Up') AND claimed_by_ngo_id IS NOT NULL)",
             name="ck_listing_claim_consistency"),
         db.CheckConstraint("expiry_window BETWEEN 1 AND 168", name="ck_listing_expiry_window"),

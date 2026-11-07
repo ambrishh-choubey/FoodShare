@@ -145,6 +145,15 @@ def pickup_listing(listing_id):
 
 
 # ------------------------------------------------------------------- admin
+
+
+@bp.get("/analytics")
+@api_login_required()
+def analytics():
+    return ok(services.analytics_for(g.user))
+
+
+
 @bp.get("/users")
 @api_login_required(ADMIN)
 def list_users():

@@ -44,6 +44,11 @@ class DatabaseConstraints(AppTestCase):
         self.assert_rejected("UPDATE donation_listings SET expiry_window=0 WHERE id=:i", i=self.listing.id)
         self.assert_rejected("UPDATE donation_listings SET expiry_window=500 WHERE id=:i", i=self.listing.id)
 
+    def test_withdrawn_listing_cannot_have_a_claimant(self):
+        self.assert_rejected(
+            "UPDATE donation_listings SET status='Withdrawn', claimed_by_ngo_id=:n WHERE id=:i",
+            n=self.ngo.id, i=self.listing.id)
+    
     def test_invalid_role_is_rejected(self):
         self.assert_rejected("UPDATE users SET role='Hacker' WHERE id=:i", i=self.donor.id)
 

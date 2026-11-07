@@ -221,3 +221,6 @@ footer.fs-footer { color: var(--fs-muted); }
   .table-stack td[colspan] { display: block; }
   .table-stack td[colspan]::before { content: none; }
 }
+
+.chart-box { position: relative; height: 280px; }
+.chart-box .empty-state { padding-top: 5rem; }

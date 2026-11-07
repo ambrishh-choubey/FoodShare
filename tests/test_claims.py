@@ -88,7 +88,7 @@ class SimultaneousClaims(AppTestCase):
         results = run_in_threads(self.app, [claim, withdraw])
         self.assertEqual([r for r in results if r[0] == "crash"], [])
         self.assertEqual(len([r for r in results if r[0] == "ok"]), 1, results)
-        self.assertIn(self.status_of(listing_id), (CLAIMED, None))
+        self.assertIn(self.status_of(listing_id), (CLAIMED, "Withdrawn"))
 
 
 class ClaimRules(AppTestCase):
@@ -158,7 +158,7 @@ class Withdrawals(AppTestCase):
 
     def test_donor_can_withdraw_a_pending_listing(self):
         services.withdraw_listing(self.donor, self.lid)
-        self.assertIsNone(self.status_of(self.lid))
+        self.assertEqual(self.status_of(self.lid), "Withdrawn")
 
     def test_cannot_withdraw_after_it_was_claimed(self):
         services.claim_listing(self.ngo, self.lid)
@@ -185,7 +185,7 @@ class Withdrawals(AppTestCase):
         res = client.delete(f"/api/v1/listings/{self.lid}",
                             headers={"X-CSRFToken": client.token})
         self.assertEqual(res.status_code, 200)
-        self.assertIsNone(self.status_of(self.lid))
+        self.assertEqual(self.status_of(self.lid), "Withdrawn")
 
 
 class PickupCompletion(AppTestCase):

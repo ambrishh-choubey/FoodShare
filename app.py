@@ -256,6 +256,12 @@ def create_app(config=None, database_uri=None):
             flash(err.message, "warning")
         return redirect(url_for("admin_panel"))
 
+
+    @app.route("/analytics")
+    @web_login_required()
+    def analytics():
+        return render_template("analytics.html", data=services.analytics_for(g.user))
+
     @app.route("/api/docs")
     def api_docs():
         return render_template("api_docs.html", endpoints=API_ENDPOINTS)

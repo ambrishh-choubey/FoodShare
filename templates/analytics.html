@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Impact{% endblock %}
+
+{% block hero %}
+<section class="page-banner">
+  <div class="container">
+    <h2><i class="bi bi-bar-chart-line"></i> {{ {'Donor': 'Your impact', 'NGO': 'Your pickups', 'Admin': 'Platform activity'}[data.role] }}</h2>
+    <p class="mb-0 opacity-75">Calculated live from FoodShare's database records &middot; updated {{ data.as_of[:16].replace('T', ' ') }} UTC</p>
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+{% macro stat(label, value, icon, hint='', cols='col-6 col-md-4 col-xl-2') -%}
+<div class="{{ cols }}">
+  <div class="fs-card stat-card h-100 hover-lift">
+    <i class="bi bi-{{ icon }} fs-3 text-success"></i>
+    <div class="num">{{ value }}</div>
+    <div class="fw-semibold">{{ label }}</div>
+    {% if hint %}<div class="small text-muted">{{ hint }}</div>{% endif %}
+  </div>
+</div>
+{%- endmacro %}
+
+{% macro chart_card(title, canvas_id, cols) -%}
+<div class="{{ cols }}">
+  <div class="fs-card p-3 h-100">
+    <h5 class="mb-3">{{ title }}</h5>
+    <div class="chart-box"><canvas id="{{ canvas_id }}" role="img" aria-label="{{ title }}"></canvas></div>
+  </div>
+</div>
+{%- endmacro %}
+
+{% if data.role == 'Donor' %}
+  {% set L = data.listings %}
+  <div class="row g-3 mb-4">
+    {{ stat('Total posted', L.total, 'box-seam') }}
+    {{ stat('Active', L.active, 'activity', 'available + awaiting pickup') }}
+    {{ stat('Completed', L.completed, 'check2-all', 'picked up by an NGO') }}
+    {{ stat('Awaiting pickup', L.claimed, 'bag-check', 'claimed, not collected yet') }}
+    {{ stat('Withdrawn', L.withdrawn, 'x-circle', 'removed by you') }}
+    {{ stat('Expired', L.expired, 'hourglass-bottom', 'no NGO claimed in time') }}
+  </div>
+  {% if L.total %}
+  <div class="row g-4 mb-4">
+    {{ chart_card('Where your donations ended up', 'chart-status', 'col-lg-5') }}
+    {{ chart_card('Donations posted, last 14 days (UTC)', 'chart-activity', 'col-lg-7') }}
+  </div>
+  {% else %}
+  <div class="fs-card empty-state mb-4"><i class="bi bi-basket"></i>You haven't posted any donations yet.<br><a href="{{ url_for('donor_dashboard') }}">Post your first one</a> and your impact will appear here.</div>
+  {% endif %}
+
+{% elif data.role == 'NGO' %}
+  {% set C = data.claims %}
+  <div class="row g-3 mb-4">
+    {{ stat('Donations claimed', C.claimed_total, 'bag-check', 'all-time', 'col-6 col-lg-3') }}
+    {{ stat('Completed pickups', C.completed, 'check2-all', 'collected', 'col-6 col-lg-3') }}
+    {{ stat('Pending pickups', C.pending_pickups, 'truck', 'claimed, not collected yet', 'col-6 col-lg-3') }}
+    {{ stat('Donors helped', C.donors_helped, 'shop', 'different donors you collected from or claimed', 'col-6 col-lg-3') }}
+  </div>
+  {% if C.claimed_total %}
+  <div class="row g-4 mb-4">
+    {{ chart_card('Your claims: completed vs pending', 'chart-pickups', 'col-lg-6') }}
+  </div>
+  {% else %}
+  <div class="fs-card empty-state mb-4"><i class="bi bi-inbox"></i>You haven't claimed any donations yet.<br><a href="{{ url_for('ngo_dashboard') }}">Find food near you</a> and your pickups will appear here.</div>
+  {% endif %}
+
+{% else %}
+  {% set U = data.users %}{% set L = data.listings %}
+  <h5 class="mb-2">People</h5>
+  <div class="row g-3 mb-4">
+    {{ stat('Donors', U.donors, 'shop', 'registered', 'col-6 col-lg-3') }}
+    {{ stat('NGOs', U.ngos, 'building', 'registered', 'col-6 col-lg-3') }}
+    {{ stat('NGOs approved', U.ngos_approved, 'patch-check', '', 'col-6 col-lg-3') }}
+    {{ stat('NGOs pending', U.ngos_pending, 'hourglass-split', 'waiting for review', 'col-6 col-lg-3') }}
+  </div>
+  <h5 class="mb-2">Donations</h5>
+  <div class="row g-3 mb-4">
+    {{ stat('Total posted', L.total, 'box-seam', 'all time', 'col-6 col-lg-3') }}
+    {{ stat('Completed', L.completed, 'check2-all', 'picked up', 'col-6 col-lg-3') }}
+    {{ stat('Active', L.active, 'activity', 'available + awaiting pickup', 'col-6 col-lg-3') }}
+    {{ stat('Posted in last 7 days', data.posted_last_7_days, 'calendar-week', 'platform activity', 'col-6 col-lg-3') }}
+  </div>
+  {% if L.total or U.ngos %}
+  <div class="row g-4 mb-4">
+    {{ chart_card('Donation outcomes', 'chart-status', 'col-lg-4') }}
+    {{ chart_card('Donations posted, last 14 days (UTC)', 'chart-activity', 'col-lg-5') }}
+    {{ chart_card('NGO approvals', 'chart-ngos', 'col-lg-3') }}
+  </div>
+  {% else %}
+  <div class="fs-card empty-state mb-4"><i class="bi bi-graph-up"></i>No activity on the platform yet.</div>
+  {% endif %}
+{% endif %}
+
+<div class="fs-card p-3 small text-muted">
+  <b>How these numbers are calculated</b>
+  <ul class="mb-2 mt-1">
+    <li><b>Active</b> = still in progress: available to NGOs (not expired) or claimed and awaiting pickup.</li>
+    <li><b>Completed</b> = an NGO marked the pickup as done. <b>Expired</b> = nobody claimed it before its deadline. <b>Withdrawn</b> = the donor removed it while unclaimed.</li>
+    <li>Every donation is counted in exactly one outcome, so the outcomes always add up to the total.</li>
+  </ul>
+  FoodShare does <b>not</b> estimate kilograms or meals saved: quantities are entered as free text (for example "20 meals"), so there is no reliable number to add up.
+</div>
+<script id="boot" type="application/json">{{ data|tojson }}</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/analytics.js') }}"></script>
+{% endblock %}

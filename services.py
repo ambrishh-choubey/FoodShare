@@ -8,12 +8,13 @@ MySQL or PostgreSQL alike.
 """
 import math
 import time
-
+from datetime import datetime, timedelta
+from sqlalchemy import and_, case, func
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import joinedload
 import throttle
 from database import (ADMIN, CLAIMED, DEFAULT_LAT, DEFAULT_LNG, DONOR, NGO,
-                      PENDING, PICKED_UP, DonationListing, User, db, utcnow)
+                      PENDING, PICKED_UP,WITHDRAWN,DonationListing, User, db, utcnow)
 
 WEAK_PASSWORDS = {"admin123", "password", "password1", "password123", "12345678",
                   "123456789", "1234567890", "admin", "administrator", "qwerty123",
@@ -300,6 +301,8 @@ def claim_listing(ngo, listing_id):
     listing = db.session.get(DonationListing, listing_id)
     if listing is None:
         raise ServiceError("Listing not found.", "not_found", 404)
+    if listing.status == WITHDRAWN:
+        raise ServiceError("Listing not found.", "not_found", 404)
     if listing.status != PENDING:
         if listing.claimed_by_ngo_id == ngo.id:
             raise ServiceError("You have already claimed this listing.",
@@ -310,15 +313,16 @@ def claim_listing(ngo, listing_id):
 
 
 def withdraw_listing(donor, listing_id):
-    """Delete a listing - only by its own donor and only while still Pending."""
+    """Withdraw a listing - only by its own donor and only while still Pending.
+        The row is KEPT with status Withdrawn so impact statistics stay truthful."""
     _require_role(donor, DONOR, "withdraw listings")
-    deleted = _write(lambda: (
+    withdrawn = _write(lambda: (
         db.session.query(DonationListing)
         .filter(DonationListing.id == listing_id,
                 DonationListing.donor_id == donor.id,
                 DonationListing.status == PENDING)
-        .delete(synchronize_session=False)))
-    if deleted == 1:
+        .update({DonationListing.status: WITHDRAWN}, synchronize_session=False)))
+    if withdrawn == 1:
         return
     listing = db.session.get(DonationListing, listing_id)
     if listing is None or listing.donor_id != donor.id:
@@ -357,3 +361,78 @@ def get_stats():
         "donors": User.query.filter_by(role=DONOR).count(),
         "ngos": User.query.filter_by(role=NGO).count(),
     }
+
+# --------------------------------------------------------------- analytics
+ACTIVITY_DAYS = 14
+
+
+def _outcome_counts(*filters):
+    """One SQL query -> mutually exclusive buckets that always add up to `total`.
+
+    available = Pending and not yet expired     expired   = Pending and past its deadline
+    claimed   = claimed, awaiting pickup        completed = Picked_Up
+    withdrawn = removed by the donor            active    = available + claimed
+    """
+    live = DonationListing.expires_at > utcnow()
+
+    def count_if(condition):
+        return func.coalesce(func.sum(case((condition, 1), else_=0)), 0)
+
+    row = db.session.query(
+        func.count(DonationListing.id),
+        count_if(and_(DonationListing.status == PENDING, live)),
+        count_if(and_(DonationListing.status == PENDING, ~live)),
+        count_if(DonationListing.status == CLAIMED),
+        count_if(DonationListing.status == PICKED_UP),
+        count_if(DonationListing.status == WITHDRAWN),
+    ).filter(*filters).one()
+    total, available, expired, claimed, completed, withdrawn = (int(v or 0) for v in row)
+    return {"total": total, "available": available, "claimed": claimed,
+            "completed": completed, "withdrawn": withdrawn, "expired": expired,
+            "active": available + claimed}
+
+
+def _posted_per_day(*filters, days=ACTIVITY_DAYS):
+    """Donations posted per UTC day for the last `days` days (zero-filled)."""
+    start = utcnow().date() - timedelta(days=days - 1)
+    since = datetime.combine(start, datetime.min.time())
+    per_day = {}
+    for (created,) in (db.session.query(DonationListing.created_at)
+                       .filter(DonationListing.created_at >= since, *filters)):
+        per_day[created.date()] = per_day.get(created.date(), 0) + 1
+    labels = [(start + timedelta(days=i)).isoformat() for i in range(days)]
+    values = [per_day.get(start + timedelta(days=i), 0) for i in range(days)]
+    return {"labels": labels, "values": values}
+
+
+def analytics_for(user):
+    """Impact statistics for ONE viewer, chosen by THEIR role from the session.
+    There is deliberately no parameter for 'whose numbers': nobody can ask for
+    another user's data. Everything is calculated from real database rows."""
+    as_of = utcnow().isoformat(timespec="seconds") + "Z"
+    if user.role == DONOR:
+        scope = (DonationListing.donor_id == user.id,)
+        return {"role": DONOR, "as_of": as_of,
+                "listings": _outcome_counts(*scope), "activity": _posted_per_day(*scope)}
+    if user.role == NGO:
+        scope = (DonationListing.claimed_by_ngo_id == user.id,)
+        mine = _outcome_counts(*scope)  # only Claimed / Picked_Up rows have a claimant
+        helped = db.session.query(func.count(func.distinct(DonationListing.donor_id))) \
+            .filter(*scope).scalar() or 0
+        return {"role": NGO, "as_of": as_of,
+                "claims": {"claimed_total": mine["claimed"] + mine["completed"],
+                           "completed": mine["completed"],
+                           "pending_pickups": mine["claimed"],
+                           "donors_helped": int(helped)}}
+    activity = _posted_per_day()
+    ngos = User.query.filter_by(role=NGO)
+    return {"role": ADMIN, "as_of": as_of,
+            "users": {"donors": User.query.filter_by(role=DONOR).count(),
+                      "ngos": ngos.count(),
+                      "ngos_approved": ngos.filter_by(is_approved=True).count(),
+                      "ngos_pending": ngos.filter_by(is_approved=False).count()},
+            "listings": _outcome_counts(),
+            "activity": activity,
+            "posted_last_7_days": sum(activity["values"][-7:])}
+
+
