@@ -24,7 +24,7 @@
       ? '<button class="btn btn-outline-danger btn-sm" data-withdraw="' + l.id + '" data-name="' + FS.esc(l.food_type) + '" aria-label="Withdraw listing"><i class="bi bi-trash"></i><span class="d-sm-none ms-1">Withdraw</span></button>' : '';
     const fresh = !first && known[l.id] !== l.status ? ' class="row-fresh"' : '';
     return '<tr' + fresh + '><td data-label="Food" class="fw-semibold">' + FS.esc(l.food_type) + '</td><td data-label="Quantity">' + FS.esc(l.quantity) +
-      '</td><td data-label="Expires">' + expires + '</td><td data-label="Status">' + FS.statusBadge(l.status) +
+      '</td><td data-label="Expires">' + expires + '</td><td data-label="Status">' + FS.stageBadge(l) + FS.timeline(l) +
       '</td><td data-label="Claimed by">' + claimed + '</td><td class="text-end">' + action + '</td></tr>';
   }
 
@@ -35,6 +35,15 @@
     } else {
       tbody.innerHTML = listings.map(row).join('');
     }
+    if (!first) {  // tell the donor when an NGO acts on a listing (their own withdraw already toasts)
+      listings.forEach(function (l) {
+        const was = known[l.id];
+        if (!was || was === l.status) { return; }
+        if (l.status === 'Claimed') { FS.toast((l.claimed_by ? l.claimed_by.name : 'An NGO') + ' claimed "' + l.food_type + '".', 'info'); }
+        if (l.status === 'Picked_Up') { FS.toast('"' + l.food_type + '" was picked up. Thank you!', 'success'); }
+      });
+    }
+
     known = {};
     listings.forEach(function (l) { known[l.id] = l.status; });
     first = false;
@@ -109,4 +118,5 @@
 
   if (boot) { render(boot.listings); } else { refresh(false); }
   setInterval(function () { if (!document.hidden) { refresh(true); } }, 15000);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) { refresh(true); } });
 })();

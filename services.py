@@ -292,8 +292,8 @@ def claim_listing(ngo, listing_id):
                 DonationListing.status == PENDING,
                 DonationListing.expires_at > now)
         .update({DonationListing.status: CLAIMED,
-                 DonationListing.claimed_by_ngo_id: ngo.id},
-                synchronize_session=False)))
+                DonationListing.claimed_by_ngo_id: ngo.id,
+                DonationListing.claimed_at: now})))
     if updated == 1:
         return get_listing(listing_id)
 
@@ -321,7 +321,8 @@ def withdraw_listing(donor, listing_id):
         .filter(DonationListing.id == listing_id,
                 DonationListing.donor_id == donor.id,
                 DonationListing.status == PENDING)
-        .update({DonationListing.status: WITHDRAWN}, synchronize_session=False)))
+        .update({DonationListing.status: WITHDRAWN, DonationListing.withdrawn_at: utcnow()},
+          synchronize_session=False)))
     if withdrawn == 1:
         return
     listing = db.session.get(DonationListing, listing_id)
@@ -339,7 +340,8 @@ def mark_picked_up(ngo, listing_id):
         .filter(DonationListing.id == listing_id,
                 DonationListing.claimed_by_ngo_id == ngo.id,
                 DonationListing.status == CLAIMED)
-        .update({DonationListing.status: PICKED_UP}, synchronize_session=False)))
+        .update({DonationListing.status: PICKED_UP, DonationListing.picked_up_at: utcnow()},
+            synchronize_session=False)))
     if updated == 1:
         return get_listing(listing_id)
     listing = db.session.get(DonationListing, listing_id)

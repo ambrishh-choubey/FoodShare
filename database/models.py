@@ -73,7 +73,8 @@ class User(db.Model):
                 "longitude": self.longitude, "address": self.address,
                  "is_approved": self.is_approved}
 
-
+STAGE_LABELS = {"available": "Available", "pickup_pending": "Claimed - pickup pending",
+                "completed": "Completed", "withdrawn": "Withdrawn", "expired": "Expired"}
 class DonationListing(db.Model):
     __tablename__ = "donation_listings"
     __table_args__ = (
@@ -92,6 +93,9 @@ class DonationListing(db.Model):
     status = db.Column(db.String(12), nullable=False, default=PENDING, index=True)
     claimed_by_ngo_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
+    claimed_at = db.Column(db.DateTime, nullable=True)
+    picked_up_at = db.Column(db.DateTime, nullable=True)
+    withdrawn_at = db.Column(db.DateTime, nullable=True)
     # Stored (not computed) so a claim can check expiry inside one atomic UPDATE.
     expires_at = db.Column(db.DateTime, nullable=False, index=True)
 
@@ -113,7 +117,16 @@ class DonationListing(db.Model):
     @property
     def is_expired(self):
         return self.status == PENDING and utcnow() >= self.expires_at
-
+    @property
+    def stage(self):
+        """The stage shown to users, derived from the status model (nothing extra is stored)."""
+        if self.status == CLAIMED:
+            return "pickup_pending"
+        if self.status == PICKED_UP:
+            return "completed"
+        if self.status == WITHDRAWN:
+            return "withdrawn"
+        return "expired" if self.is_expired else "available"
     @property
     def hours_left(self):
         return max(0.0, (self.expires_at - utcnow()).total_seconds() / 3600)
@@ -150,6 +163,8 @@ class DonationListing(db.Model):
             "quantity": self.quantity,
             "expiry_window_hours": self.expiry_window,
             "status": self.status,
+            "stage": self.stage,
+            "stage_label": STAGE_LABELS[self.stage],
             "created_at": iso(self.created_at),
             "expires_at": iso(self.expires_at),
             "hours_left": round(self.hours_left, 2),
@@ -157,6 +172,9 @@ class DonationListing(db.Model):
             "donor": donor,
             "claimed_by": claimed,
         }
+        if self.can_view_exact(viewer):  # lifecycle times: donor, claiming NGO, admin only
+            data.update(claimed_at=iso(self.claimed_at), picked_up_at=iso(self.picked_up_at),
+                        withdrawn_at=iso(self.withdrawn_at))
         if distance_km is not None:
             data["distance_km"] = round(distance_km, 1)
         return data

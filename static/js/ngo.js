@@ -115,7 +115,7 @@
       '<a class="small" target="_blank" rel="noopener" href="' + mapsLink(d) + '"><i class="bi bi-geo-alt"></i> Open exact location</a>';
     return '<tr><td data-label="Food" class="fw-semibold">' + FS.esc(l.food_type) + '</td><td data-label="Quantity">' + FS.esc(l.quantity) +
       '</td><td data-label="Donor">' + FS.esc(d.name) + '<div class="small text-muted">' + FS.esc(d.email || '') + '</div></td>' +
-      '<td data-label="Pickup details">' + where + '</td><td data-label="Status">' + FS.statusBadge(l.status) + '</td><td class="text-end">' + action + '</td></tr>';
+      '<td data-label="Pickup details">' + where + '</td><td data-label="Status">' + FS.stageBadge(l) + FS.timeline(l) + '</td><td class="text-end">' + action + '</td></tr>';
   }
 
   function render(fit) {
@@ -214,4 +214,5 @@
 
   if (boot) { render(true); } else { load(true, false); }
   setInterval(function () { if (!document.hidden) { load(false, true); } }, 20000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) { load(false, true); } });
 })();

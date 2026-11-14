@@ -142,7 +142,38 @@
     const s = map[status] || ['secondary', 'question', status];
     return '<span class="badge bg-' + s[0] + '"><i class="bi bi-' + s[1] + ' me-1"></i>' + esc(s[2]) + '</span>';
   }
+    // Stage badge + timeline: both read the `stage` the SERVER derived from the status model.
+  function stageBadge(l) {
+    const map = {
+      available: ['warning text-dark', 'hourglass-split'],
+      pickup_pending: ['info text-dark', 'truck'],
+      completed: ['success', 'check2-all'],
+      withdrawn: ['secondary', 'x-circle'],
+      expired: ['danger', 'alarm']
+    };
+    const s = map[l.stage] || ['secondary', 'question'];
+    return '<span class="badge bg-' + s[0] + '"><i class="bi bi-' + s[1] + ' me-1"></i>' + esc(l.stage_label || l.status) + '</span>';
+  }
 
+  function trackStep(done, label, iso) {
+    const when = done ? (iso ? fmtDateTime(iso) : 'time not recorded') : 'waiting';
+    return '<li class="' + (done ? 'done' : 'todo') + '"><i class="bi bi-' + (done ? 'check-circle-fill' : 'circle') + '"></i> ' +
+      esc(label) + ' <span>' + esc(when) + '</span></li>';
+  }
+
+  function timeline(l) {
+    const steps = [trackStep(true, 'Posted', l.created_at)];
+    if (l.stage === 'withdrawn') {
+      steps.push(trackStep(true, 'Withdrawn', l.withdrawn_at));
+    } else if (l.stage === 'expired') {
+      steps.push(trackStep(true, 'Expired, never claimed', l.expires_at));
+    } else {
+      const claimed = l.stage === 'pickup_pending' || l.stage === 'completed';
+      steps.push(trackStep(claimed, 'Claimed', l.claimed_at));
+      steps.push(trackStep(l.stage === 'completed', 'Picked up', l.picked_up_at));
+    }
+    return '<ul class="tracker">' + steps.join('') + '</ul>';
+  }
   window.FoodShare = {
     esc: esc, api: api, toast: toast, confirm: confirmDialog, busy: busy,
     spinnerBlock: spinnerBlock, showError: showError, fmtDateTime: fmtDateTime,
