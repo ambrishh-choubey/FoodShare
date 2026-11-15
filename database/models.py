@@ -57,6 +57,7 @@ class User(db.Model):
 
     # NGOs start unapproved and need an admin before they can claim. Donors/admins: True.
     is_approved = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    created_at = db.Column(db.DateTime, nullable=True, default=utcnow)  # NULL for accounts made before this column existed
 
 
     def set_password(self, password):
@@ -185,7 +186,27 @@ class LoginAttempt(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     key = db.Column(db.String(200), nullable=False, index=True)  # "acct:<email>" or "ip:<addr>"
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow, index=True)
+class Notification(db.Model):
+    """An in-app message for ONE user. UNIQUE(user_id, dedupe_key) is what
+    guarantees the same event never notifies the same person twice."""
+    __tablename__ = "notifications"
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "dedupe_key", name="uq_notification_event"),
+        db.Index("ix_notifications_user_unread", "user_id", "read_at"),
+    )
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    listing_id = db.Column(db.Integer, db.ForeignKey("donation_listings.id"), nullable=True)
+    kind = db.Column(db.String(24), nullable=False)   # claimed, picked_up, expired, expiring, pickup_due
+    message = db.Column(db.String(255), nullable=False)
+    dedupe_key = db.Column(db.String(80), nullable=False)  # e.g. "claimed:42"
+    created_at = db.Column(db.DateTime, nullable=False, default=utcnow, index=True)
+    read_at = db.Column(db.DateTime, nullable=True)  # NULL = unread
 
+    def to_dict(self):
+        return {"id": self.id, "kind": self.kind, "message": self.message,
+                "listing_id": self.listing_id, "created_at": iso(self.created_at),
+                "read": self.read_at is not None, "read_at": iso(self.read_at)}
 
 
 

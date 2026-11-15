@@ -19,7 +19,8 @@ from pathlib import Path
 import click
 from flask import (Flask,abort, flash, g, redirect, render_template, request,
                    session, url_for)
-
+import notifications
+import scheduler
 import services
 from api import API_ENDPOINTS, bp as api_bp
 from auth import home_url, load_current_user, login_user, web_login_required
@@ -92,6 +93,7 @@ def create_app(config=None, database_uri=None):
 
     init_db(app, database_uri)
     app.register_blueprint(api_bp)
+    scheduler.init_scheduler(app)  # optional APScheduler job (see scheduler.py)
 
     @app.before_request
     def _load_user():
@@ -107,6 +109,12 @@ def create_app(config=None, database_uri=None):
                     db_info=describe_database())
 
     # ------------------------------------------------------------------ CLI
+
+    @app.cli.command("notify-deadlines")
+    def notify_deadlines_command():
+        """Create due deadline notifications. Run every ~5 minutes from cron / Task Scheduler."""
+        created = notifications.run_deadline_scan()
+        click.echo(f"{created} notification(s) created.")
     @app.cli.command("create-admin")
     @click.option("--name", default="Platform Admin", show_default=True)
     @click.option("--email", prompt="Admin email")

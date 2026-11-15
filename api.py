@@ -6,7 +6,7 @@ state-changing request. All responses use the envelope in responses.py."""
 from datetime import datetime, timezone
 
 from flask import Blueprint, g, request, session
-
+import notifications
 import services
 from auth import api_login_required, login_user
 from database import ADMIN, DONOR, NGO, User, describe_database
@@ -153,7 +153,33 @@ def analytics():
     return ok(services.analytics_for(g.user))
 
 
+@bp.get("/notifications")
+@api_login_required(DONOR, NGO)
+def list_notifications():
+    """YOUR notifications only (the query is always filtered by the logged-in user)."""
+    try:
+        limit = min(max(int(request.args.get("limit", 20)), 1), 50)
+    except ValueError:
+        limit = 20
+    unread_only = request.args.get("unread") in ("1", "true", "yes")
+    rows = notifications.list_for(g.user, unread_only, limit)
+    return ok([n.to_dict() for n in rows], count=len(rows),
+              unread=notifications.unread_count(g.user))
 
+
+@bp.post("/notifications/read-all")
+@api_login_required(DONOR, NGO)
+def read_all_notifications():
+    count = notifications.mark_all_read(g.user)
+    return ok({"marked": count}, "All notifications marked as read.")
+
+
+@bp.post("/notifications/<int:notification_id>/read")
+@api_login_required(DONOR, NGO)
+def read_notification(notification_id):
+    if not notifications.mark_read(g.user, notification_id):
+        return fail("not_found", "Notification not found.", 404)  # also for other people's ids
+    return ok(None, "Marked as read.")
 @bp.get("/users")
 @api_login_required(ADMIN)
 def list_users():

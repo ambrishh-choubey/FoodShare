@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import and_, case, func
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import joinedload
+import notifications
 import throttle
 from database import (ADMIN, CLAIMED, DEFAULT_LAT, DEFAULT_LNG, DONOR, NGO,
                       PENDING, PICKED_UP,WITHDRAWN,DonationListing, User, db, utcnow)
@@ -295,7 +296,9 @@ def claim_listing(ngo, listing_id):
                 DonationListing.claimed_by_ngo_id: ngo.id,
                 DonationListing.claimed_at: now})))
     if updated == 1:
-        return get_listing(listing_id)
+        listing = get_listing(listing_id)
+        notifications.on_claimed(listing, ngo)
+        return listing
 
     # Lost the race (or invalid): work out why, from fresh data.
     listing = db.session.get(DonationListing, listing_id)
@@ -343,7 +346,9 @@ def mark_picked_up(ngo, listing_id):
         .update({DonationListing.status: PICKED_UP, DonationListing.picked_up_at: utcnow()},
             synchronize_session=False)))
     if updated == 1:
-        return get_listing(listing_id)
+        listing = get_listing(listing_id)
+        notifications.on_picked_up(listing, ngo)
+        return listing
     listing = db.session.get(DonationListing, listing_id)
     if listing is None or listing.claimed_by_ngo_id != ngo.id:
         raise ServiceError("Listing not found.", "not_found", 404)
