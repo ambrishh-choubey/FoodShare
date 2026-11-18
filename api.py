@@ -180,6 +180,15 @@ def read_notification(notification_id):
     if not notifications.mark_read(g.user, notification_id):
         return fail("not_found", "Notification not found.", 404)  # also for other people's ids
     return ok(None, "Marked as read.")
+@bp.get("/admin/listings")
+@api_login_required(ADMIN)
+def admin_listings():
+    """Filtered, paginated donations: ?status=expired&from=2026-11-01&to=2026-11-16&page=2"""
+    page = services.admin_listings_page(g.user, request.args)
+    if page["errors"]:
+        return fail("validation_error", page["errors"][0], 400)
+    return ok([l.to_dict(viewer=g.user) for l in page["rows"]], total=page["total"],
+              page=page["page"], pages=page["pages"], range=page["range_stats"])
 @bp.get("/users")
 @api_login_required(ADMIN)
 def list_users():

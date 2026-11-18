@@ -6,26 +6,48 @@
   <div class="container">
     <h2><i class="bi bi-shield-check"></i> Admin overview</h2>
     <span class="chip"><i class="bi bi-database"></i> {{ db_info.engine|upper }} &middot; {{ db_info.database }}</span>
-    <span class="chip"><i class="bi bi-people"></i> Users <b>{{ users|length }}</b></span>
-    <span class="chip"><i class="bi bi-box-seam"></i> Listings <b>{{ stats.donations }}</b></span>
-    <span class="chip"><i class="bi bi-basket2"></i> Active <b>{{ stats.active }}</b></span>
-    <span class="chip"><i class="bi bi-check2-all"></i> Picked up <b>{{ stats.picked_up }}</b></span>
+    <span class="chip"><i class="bi bi-shop"></i> Donors <b>{{ overview.users.donors }}</b></span>
+    <span class="chip"><i class="bi bi-building"></i> NGOs <b>{{ overview.users.ngos }}</b></span>
+    <span class="chip"><i class="bi bi-hourglass-split"></i> Awaiting approval <b>{{ pending|length }}</b></span>
   </div>
 </section>
 {% endblock %}
 
 {% block content %}
+{# ---- 1. Platform-wide statistics (all time, straight from the database) ---- #}
+{% set U = overview.users %}{% set L = overview.listings %}
+{% set cards = [
+  ('Donors', U.donors, 'shop'), ('NGOs', U.ngos, 'building'),
+  ('NGOs approved', U.ngos_approved, 'patch-check'), ('Awaiting approval', U.ngos_pending, 'hourglass-split'),
+  ('Total posted', L.total, 'box-seam'), ('Active', L.active, 'activity'),
+  ('Completed', L.completed, 'check2-all'), ('Withdrawn', L.withdrawn, 'x-circle'),
+  ('Expired', L.expired, 'alarm'), ('Posted, last 7 days', overview.posted_last_7_days, 'calendar-week')] %}
+<div class="row g-3 mb-2">
+  {% for label, value, icon in cards %}
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="fs-card stat-card h-100 hover-lift">
+      <i class="bi bi-{{ icon }} fs-4 text-success"></i>
+      <div class="num">{{ value }}</div>
+      <div class="fw-semibold small">{{ label }}</div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+<p class="small text-muted mb-4">All-time totals. Charts are on the <a href="{{ url_for('analytics') }}">Impact page</a>.</p>
+
+{# ---- 2. Pending NGO approvals (existing feature, now also shows when they registered) ---- #}
 <div class="fs-card mb-4">
   <div class="card-header">NGO approvals <span class="badge bg-warning text-dark ms-1">{{ pending|length }}</span></div>
   <div class="table-responsive">
     <table class="table align-middle mb-0 table-stack">
-      <thead><tr><th>NGO</th><th>Email</th><th>Location</th><th></th></tr></thead>
+      <thead><tr><th>NGO</th><th>Email</th><th>Location</th><th>Registered</th><th></th></tr></thead>
       <tbody>
       {% for n in pending %}
         <tr>
           <td data-label="NGO" class="fw-semibold">{{ n.name }}</td>
           <td data-label="Email">{{ n.email }}</td>
           <td data-label="Location">{{ '%.3f'|format(n.latitude) }}, {{ '%.3f'|format(n.longitude) }}</td>
+          <td data-label="Registered">{{ n.created_at.strftime('%d %b %Y %H:%M') + ' UTC' if n.created_at else '-' }}</td>
           <td class="text-end">
             <form method="post" action="{{ url_for('review_ngo', user_id=n.id, action='approve') }}" data-confirm="Approve {{ n.name }}? They will be able to see and claim food donations." data-confirm-title="Approve NGO?" data-confirm-ok="Approve">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -34,12 +56,32 @@
           </td>
         </tr>
       {% else %}
-        <tr class="empty-row"><td colspan="4"><div class="empty-state"><i class="bi bi-patch-check"></i>No NGOs are waiting for approval.</div></td></tr>
+        <tr class="empty-row"><td colspan="5"><div class="empty-state"><i class="bi bi-patch-check"></i>No NGOs are waiting for approval.</div></td></tr>
       {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
+
+{# ---- 3. Recent activity feed ---- #}
+<div class="fs-card mb-4">
+  <div class="card-header">Recent activity</div>
+  {% if activity %}
+  <ul class="list-group list-group-flush">
+    {% for e in activity %}
+    <li class="list-group-item bg-transparent d-flex gap-2 align-items-start">
+      <i class="bi bi-{{ e.icon }} text-success mt-1"></i>
+      <span>{{ e.text }}</span>
+      <small class="ms-auto text-muted text-nowrap">{{ e.at.strftime('%d %b %H:%M') }} UTC</small>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <div class="empty-state"><i class="bi bi-clock-history"></i>No activity yet.</div>
+  {% endif %}
+</div>
+
+{# ---- 4. Users (existing feature, plus a "Joined" column) ---- #}
 <div class="fs-card mb-4">
   <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
     <span>Users ({{ users|length }})</span>
@@ -47,14 +89,15 @@
   </div>
   <div class="table-responsive">
     <table class="table table-sm table-hover align-middle mb-0" id="users-table">
-      <thead><tr><th>ID</th><th>Name</th><th>Role</th><th>Email</th><th>Lat</th><th>Lng</th><th>Approval</th></tr></thead>
+      <thead><tr><th>ID</th><th>Name</th><th>Role</th><th>Email</th><th>Joined</th><th>Lat</th><th>Lng</th><th>Approval</th></tr></thead>
       <tbody>
       {% for u in users %}
         <tr>
           <td>{{ u.id }}</td><td>{{ u.name }}</td>
           <td><span class="badge bg-{{ 'dark' if u.role == ADMIN else 'primary' if u.role == NGO else 'success' }}">{{ u.role }}</span></td>
           <td>{{ u.email }}</td>
-          <td>{{ '%.4f'|format(u.latitude) }}</td>
+          <td>{{ u.created_at.strftime('%d %b %Y') if u.created_at else '-' }}</td>
+          <td>{{ '%.4f'|format(u.latitude) }}</td><td>{{ '%.4f'|format(u.longitude) }}</td>
           <td>
             {% if u.role == NGO and u.is_approved %}
             <form method="post" action="{{ url_for('review_ngo', user_id=u.id, action='revoke') }}" data-confirm="Revoke approval for {{ u.name }}? They will lose access to food listings." data-confirm-title="Revoke approval?" data-confirm-ok="Revoke" data-confirm-danger>
@@ -71,28 +114,72 @@
   </div>
 </div>
 
-<div class="fs-card">
-  <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
-    <span>Donation listings ({{ listings|length }})</span>
-    <input class="form-control form-control-sm" style="max-width:240px" placeholder="Filter listings..." data-filter-table="listings-table">
+{# ---- 5. Donations with filters + pagination ---- #}
+{% set f = page.filters %}
+{% set badge = {'available': 'warning text-dark', 'pickup_pending': 'info text-dark', 'completed': 'success', 'withdrawn': 'secondary', 'expired': 'danger'} %}
+<div class="fs-card" id="listings">
+  <div class="card-header">Donations</div>
+  <form method="get" action="{{ url_for('admin_panel') }}#listings" class="row g-2 align-items-end p-3 border-bottom">
+    <div class="col-12 col-md-3">
+      <label class="form-label small mb-1" for="f-status">Status</label>
+      <select class="form-select form-select-sm" id="f-status" name="status">
+        <option value="">All statuses</option>
+        {% for value, label in [('available', 'Available'), ('pickup_pending', 'Claimed - pickup pending'), ('completed', 'Completed'), ('withdrawn', 'Withdrawn'), ('expired', 'Expired')] %}
+        <option value="{{ value }}" {{ 'selected' if f.status == value }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-6 col-md-3">
+      <label class="form-label small mb-1" for="f-from">Posted from</label>
+      <input class="form-control form-control-sm" type="date" id="f-from" name="from" value="{{ f.date_from }}">
+    </div>
+    <div class="col-6 col-md-3">
+      <label class="form-label small mb-1" for="f-to">Posted to</label>
+      <input class="form-control form-control-sm" type="date" id="f-to" name="to" value="{{ f.date_to }}">
+    </div>
+    <div class="col-12 col-md-3 d-flex gap-2">
+      <button class="btn btn-fs btn-sm" type="submit"><i class="bi bi-funnel"></i> Apply</button>
+      <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin_panel') }}#listings">Reset</a>
+    </div>
+  </form>
+
+  <div class="px-3 py-2 small border-bottom">
+    <b>{{ page.total }}</b> donation{{ '' if page.total == 1 else 's' }} match
+    {% set R = page.range_stats %}
+    Available {{ R.available }} &middot; Claimed {{ R.claimed }} &middot; Completed {{ R.completed }} &middot; Withdrawn {{ R.withdrawn }} &middot; Expired {{ R.expired }}
+    <input class="form-control form-control-sm d-inline-block ms-2" style="max-width:200px" placeholder="Search this page..." data-filter-table="listings-table">
   </div>
+
   <div class="table-responsive">
     <table class="table table-sm table-hover align-middle mb-0" id="listings-table">
-      <thead><tr><th>ID</th><th>Food</th><th>Qty</th><th>Donor</th><th>Expires</th><th>Status</th><th>Claimed by</th></tr></thead>
+      <thead><tr><th>ID</th><th>Food</th><th>Qty</th><th>Donor</th><th>Posted</th><th>Expires</th><th>Stage</th><th>Claimed by</th></tr></thead>
       <tbody>
-      {% for l in listings %}
+      {% for l in page.rows %}
         <tr>
           <td>{{ l.id }}</td><td>{{ l.food_type }}</td><td>{{ l.quantity }}</td>
           <td>{{ l.donor.name }}</td>
-          <td>{{ l.expires_at.strftime('%d %b %H:%M') }} UTC{% if l.is_expired %} <span class="badge bg-secondary">Expired</span>{% endif %}</td>
-          <td>{{ l.status }}</td>
+          <td>{{ l.created_at.strftime('%d %b %H:%M') }}</td>
+          <td>{{ l.expires_at.strftime('%d %b %H:%M') }} UTC</td>
+          <td><span class="badge bg-{{ badge[l.stage] }}">{{ l.stage_label }}</span></td>
           <td>{{ l.claimed_by.name if l.claimed_by else '—' }}</td>
         </tr>
       {% else %}
-        <tr><td colspan="7" class="text-center text-muted py-3">No listings yet.</td></tr>
+        <tr><td colspan="8" class="text-center text-muted py-3">No donations match these filters.</td></tr>
       {% endfor %}
       </tbody>
     </table>
   </div>
+
+  {% if page.pages > 1 %}
+  <nav class="d-flex justify-content-between align-items-center p-3" aria-label="Donation pages">
+    {% if page.page > 1 %}
+    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin_panel', status=f.status, page=page.page - 1, **{'from': f.date_from, 'to': f.date_to}) }}#listings">&larr; Previous</a>
+    {% else %}<span></span>{% endif %}
+    <span class="small text-muted">Page {{ page.page }} of {{ page.pages }}</span>
+    {% if page.page < page.pages %}
+    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin_panel', status=f.status, page=page.page + 1, **{'from': f.date_from, 'to': f.date_to}) }}#listings">Next &rarr;</a>
+    {% else %}<span></span>{% endif %}
+  </nav>
+  {% endif %}
 </div>
 {% endblock %}

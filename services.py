@@ -442,4 +442,107 @@ def analytics_for(user):
             "activity": activity,
             "posted_last_7_days": sum(activity["values"][-7:])}
 
+# ------------------------------------------------------- admin dashboard
+ADMIN_PAGE_SIZE = 20
+STAGES = ("available", "pickup_pending", "completed", "withdrawn", "expired")
 
+
+def _stage_condition(stage):
+    """SQL condition for one stage. Same meaning as DonationListing.stage."""
+    live = DonationListing.expires_at > utcnow()
+    return {"available": and_(DonationListing.status == PENDING, live),
+            "expired": and_(DonationListing.status == PENDING, ~live),
+            "pickup_pending": DonationListing.status == CLAIMED,
+            "completed": DonationListing.status == PICKED_UP,
+            "withdrawn": DonationListing.status == WITHDRAWN}[stage]
+
+
+def _parse_day(text):
+    """'2026-11-16' -> datetime, '' -> None, anything else -> False (invalid)."""
+    text = (text or "").strip()
+    if not text:
+        return None
+    try:
+        return datetime.strptime(text, "%Y-%m-%d")
+    except ValueError:
+        return False
+
+
+def admin_listings_page(admin, args):
+    """One filtered, paginated page of donations for the admin dashboard.
+    `args` is request.args. Bad filter values are reported in `errors` and
+    ignored, so the page still renders. Dates are UTC and filter on the day
+    the donation was POSTED."""
+    _require_role(admin, ADMIN, "view the admin dashboard")
+    errors, filters = [], []
+    clean = {"status": "", "date_from": "", "date_to": ""}
+
+    status = (args.get("status") or "").strip()
+    if status in STAGES:
+        filters.append(_stage_condition(status))
+        clean["status"] = status
+    elif status:
+        errors.append("Unknown status filter.")
+
+    start, end = _parse_day(args.get("from")), _parse_day(args.get("to"))
+    if start is False or end is False:
+        errors.append("Dates must look like 2026-11-16.")
+        start = end = None
+    elif start and end and start > end:
+        errors.append("The start date is after the end date.")
+        start = end = None
+    if start:
+        filters.append(DonationListing.created_at >= start)
+        clean["date_from"] = start.date().isoformat()
+    if end:
+        filters.append(DonationListing.created_at < end + timedelta(days=1))  # include the whole end day
+        clean["date_to"] = end.date().isoformat()
+
+    total = db.session.query(func.count(DonationListing.id)).filter(*filters).scalar() or 0
+    pages = max(1, math.ceil(total / ADMIN_PAGE_SIZE))
+    try:
+        page = int(args.get("page", 1))
+    except (TypeError, ValueError):
+        page = 1
+    page = min(max(page, 1), pages)
+    rows = (DonationListing.query
+            .options(joinedload(DonationListing.donor), joinedload(DonationListing.claimed_by))
+            .filter(*filters)
+            .order_by(DonationListing.created_at.desc(), DonationListing.id.desc())
+            .offset((page - 1) * ADMIN_PAGE_SIZE).limit(ADMIN_PAGE_SIZE).all())
+    return {"rows": rows, "total": total, "page": page, "pages": pages,
+            "filters": clean, "errors": errors, "range_stats": _outcome_counts(*filters)}
+
+
+def recent_activity(admin, limit=15):
+    """Newest platform events, merged from the timestamps stored on donations
+    (posted / claimed / picked up / withdrawn), derived expiries and sign-ups."""
+    _require_role(admin, ADMIN, "view platform activity")
+    now = utcnow()
+    base = DonationListing.query.options(joinedload(DonationListing.donor),
+                                         joinedload(DonationListing.claimed_by))
+    ngo_name = lambda l: l.claimed_by.name if l.claimed_by else "An NGO"  # noqa: E731
+    sources = (
+        (DonationListing.created_at, "box-seam",
+         lambda l: f'{l.donor.name} posted "{l.food_type}" ({l.quantity})'),
+        (DonationListing.claimed_at, "bag-check",
+         lambda l: f'{ngo_name(l)} claimed "{l.food_type}" from {l.donor.name}'),
+        (DonationListing.picked_up_at, "check2-all",
+         lambda l: f'{ngo_name(l)} picked up "{l.food_type}" from {l.donor.name}'),
+        (DonationListing.withdrawn_at, "x-circle",
+         lambda l: f'{l.donor.name} withdrew "{l.food_type}"'),
+    )
+    events = []
+    for column, icon, text in sources:
+        for listing in (base.filter(column.isnot(None)).order_by(column.desc()).limit(limit)):
+            events.append({"at": getattr(listing, column.key), "icon": icon, "text": text(listing)})
+    for listing in (base.filter(DonationListing.status == PENDING, DonationListing.expires_at <= now)
+                    .order_by(DonationListing.expires_at.desc()).limit(limit)):
+        events.append({"at": listing.expires_at, "icon": "alarm",
+                       "text": f'"{listing.food_type}" from {listing.donor.name} expired unclaimed'})
+    for user in (User.query.filter(User.created_at.isnot(None), User.role != ADMIN)
+                 .order_by(User.created_at.desc()).limit(limit)):
+        events.append({"at": user.created_at, "icon": "person-plus",
+                       "text": f"New {user.role} registered: {user.name}"})
+    events.sort(key=lambda e: e["at"], reverse=True)
+    return events[:limit]

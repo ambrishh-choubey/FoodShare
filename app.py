@@ -246,9 +246,14 @@ def create_app(config=None, database_uri=None):
     @app.route("/admin")
     @web_login_required(ADMIN)
     def admin_panel():
+        page = services.admin_listings_page(g.user, request.args)  # filters + pagination
+        for message in page["errors"]:
+            flash(message, "warning")
         return render_template("admin.html",
                                users=User.query.order_by(User.id).all(),
-                               listings=services.all_listings(),
+                               page=page,
+                               overview=services.analytics_for(g.user),
+                               activity=services.recent_activity(g.user),
                                stats=services.get_stats(),
                                pending=services.pending_ngos())
 
