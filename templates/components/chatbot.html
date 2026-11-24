@@ -1,0 +1,21 @@
+{# FoodShare Smart Assistant: floating button + chat window (styled by css/chatbot.css, driven by js/chatbot.js) #}
+<div id="fs-chatbot" class="fs-chatbot">
+  <button type="button" id="fs-chat-toggle" class="fs-chat-toggle" aria-label="Open FoodShare Smart Assistant" aria-expanded="false" aria-controls="fs-chat-panel">
+    <i class="bi bi-chat-dots-fill"></i>
+  </button>
+  <section id="fs-chat-panel" class="fs-chat-panel" role="dialog" aria-label="FoodShare Smart Assistant" hidden>
+    <header class="fs-chat-head">
+      <div><b>FoodShare Smart Assistant</b><small>Verified answers &middot; on-device model, no external AI</small></div>
+      <div class="d-flex gap-1">
+        <button type="button" id="fs-chat-clear" class="fs-chat-icon" title="Clear conversation" aria-label="Clear conversation"><i class="bi bi-trash3"></i></button>
+        <button type="button" id="fs-chat-close" class="fs-chat-icon" title="Close" aria-label="Close assistant"><i class="bi bi-x-lg"></i></button>
+      </div>
+    </header>
+    <div id="fs-chat-log" class="fs-chat-log" role="log" aria-live="polite"></div>
+    <div id="fs-chat-suggest" class="fs-chat-suggest"></div>
+    <form id="fs-chat-form" class="fs-chat-form" autocomplete="off">
+      <input id="fs-chat-input" type="text" maxlength="500" placeholder="Ask about FoodShare..." aria-label="Your question" required>
+      <button type="submit" class="btn btn-fs" aria-label="Send message"><i class="bi bi-send-fill"></i></button>
+    </form>
+  </section>
+</div>

@@ -15,7 +15,7 @@ import secrets
 import sys
 from datetime import timedelta
 from pathlib import Path
-
+import chatbot
 import click
 from flask import (Flask,abort, flash, g, redirect, render_template, request,
                    session, url_for)
@@ -93,6 +93,7 @@ def create_app(config=None, database_uri=None):
 
     init_db(app, database_uri)
     app.register_blueprint(api_bp)
+    app.register_blueprint(chatbot.bp)
     scheduler.init_scheduler(app)  # optional APScheduler job (see scheduler.py)
 
     @app.before_request
